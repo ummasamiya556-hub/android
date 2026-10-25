@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Leaflet container and marker resets */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0f1218;
+  font-family: inherit;
+}
+
+.custom-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #1c1e24 !important;
+  color: #fff !important;
+  border: 1px solid #323640 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #1c1e24 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  padding: 6px !important;
+}
+
+/* Smoothly glide moving vehicle markers across map coordinates without stutter */
+.transit-live-bus-marker {
+  transition: transform 1.2s linear !important;
+  will-change: transform;
+}

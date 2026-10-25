@@ -1,0 +1,6 @@
+{
+  "name": "Klang Valley All-in-One Transit Navigator",
+  "description": "Unified transit navigator integrating Google Maps, Moovit live confirmed GPS, Go KL bus network, and Rapid Pulse live vehicle radar with smart deduplication.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
