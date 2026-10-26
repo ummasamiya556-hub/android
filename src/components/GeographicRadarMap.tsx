@@ -1,39 +1,198 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import L from 'leaflet';
-import { useTransit } from '../context/TransitContext';
-import { ALL_STATIONS, STATIONS_BY_ID, LINES_BY_ID, DEFAULT_WAZE_TRIPS } from '../data/transitData';
-import { Station, Vehicle, WazeWalkingTrip, WazeManeuverStep } from '../types/transit';
 import {
-  ZoomIn,
-  ZoomOut,
-  Navigation,
-  Bus,
-  Train,
-  Crosshair,
-  Layers,
-  MapPin,
-  Flag,
-  Footprints,
-  Compass,
-  ArrowLeft,
   CornerUpLeft,
   CornerUpRight,
+  Footprints,
+  Flag,
   ArrowUp,
+  ArrowLeft,
+  Compass,
+  Crosshair,
+  ZoomIn,
+  ZoomOut,
+  MapPin,
   X,
-  ShieldCheck,
-  Clock,
-  ExternalLink,
   GraduationCap,
-  Sparkles,
+  Train,
+  Bus,
 } from 'lucide-react';
+import { useTransit } from '../context/TransitContext';
+import { ALL_STATIONS, STATIONS_BY_ID, LINES_BY_ID, DEFAULT_WAZE_TRIPS } from '../data/transitData';
+import { calculateDistanceKm } from '../utils/transitGraph';
+import { Station, Vehicle, WazeWalkingTrip, WazeManeuverStep } from '../types/transit';
 
-interface GeographicRadarMapProps {
+export interface GeographicRadarMapProps {
   onBackToDirections?: () => void;
   isNavigating?: boolean;
   onStopNavigation?: () => void;
   tripId?: string;
-  currentView?: 'routes' | 'directions' | 'timetables' | 'radar';
-  selectedRouteId?: string;
+  currentView?: string;
+  selectedRouteId?: string | null;
+}
+
+// Known pedestrian street geometries for authentic walking paths
+const PEDESTRIAN_WALK_GEOMETRIES: Record<string, [number, number][]> = {
+  // Putra Court <-> PWTC LRT / Sunway Putra Hotel along Jalan 1/64d (exact street from user screenshot image_6d70ea65.png!)
+  'putra_court->pwtc_lrt': [
+    [3.1685, 101.6912],
+    [3.1684, 101.6914],
+    [3.1683, 101.6917],
+    [3.1681, 101.6920],
+    [3.1679, 101.6923],
+    [3.1677, 101.6925],
+    [3.1675, 101.6926],
+    [3.1673, 101.6927],
+    [3.1671, 101.6928],
+    [3.1669, 101.6929],
+    [3.1667, 101.6930],
+  ],
+  'pwtc_lrt->putra_court': [
+    [3.1667, 101.6930],
+    [3.1669, 101.6929],
+    [3.1671, 101.6928],
+    [3.1673, 101.6927],
+    [3.1675, 101.6926],
+    [3.1677, 101.6925],
+    [3.1679, 101.6923],
+    [3.1681, 101.6920],
+    [3.1683, 101.6917],
+    [3.1684, 101.6914],
+    [3.1685, 101.6912],
+  ],
+  'putra_court->sunway_putra': [
+    [3.1685, 101.6912],
+    [3.1684, 101.6914],
+    [3.1683, 101.6917],
+    [3.1681, 101.6920],
+    [3.1679, 101.6923],
+    [3.1677, 101.6925],
+    [3.1675, 101.6926],
+    [3.1671, 101.6928],
+    [3.1668, 101.6926],
+    [3.1666, 101.6920],
+    [3.1664, 101.6914],
+    [3.1662, 101.6908],
+  ],
+  'sunway_putra->putra_court': [
+    [3.1662, 101.6908],
+    [3.1664, 101.6914],
+    [3.1666, 101.6920],
+    [3.1668, 101.6926],
+    [3.1671, 101.6928],
+    [3.1675, 101.6926],
+    [3.1677, 101.6925],
+    [3.1679, 101.6923],
+    [3.1681, 101.6920],
+    [3.1683, 101.6917],
+    [3.1684, 101.6914],
+    [3.1685, 101.6912],
+  ],
+  // Putra Court <-> Putra KTM
+  'putra_court->putra_ktm': [
+    [3.1685, 101.6912],
+    [3.1680, 101.6911],
+    [3.1674, 101.6911],
+    [3.1668, 101.6910],
+    [3.1662, 101.6910],
+  ],
+  'putra_ktm->putra_court': [
+    [3.1662, 101.6910],
+    [3.1668, 101.6910],
+    [3.1674, 101.6911],
+    [3.1680, 101.6911],
+    [3.1685, 101.6912],
+  ],
+  // Putra KTM <-> PWTC LRT (weather linkbridge)
+  'putra_ktm->pwtc_lrt': [
+    [3.1662, 101.6910],
+    [3.1664, 101.6916],
+    [3.1667, 101.6922],
+    [3.1670, 101.6930],
+  ],
+  'pwtc_lrt->putra_ktm': [
+    [3.1670, 101.6930],
+    [3.1667, 101.6922],
+    [3.1664, 101.6916],
+    [3.1662, 101.6910],
+  ],
+  // Segambut KTM <-> SMK Segambut (Bus 190 stop KL522)
+  'segambut_station->smk_segambut': [
+    [3.1865, 101.6660],
+    [3.1864, 101.6666],
+    [3.1862, 101.6673],
+    [3.1860, 101.6680],
+    [3.1858, 101.6686],
+  ],
+  'smk_segambut->segambut_station': [
+    [3.1858, 101.6686],
+    [3.1860, 101.6680],
+    [3.1862, 101.6673],
+    [3.1864, 101.6666],
+    [3.1865, 101.6660],
+  ],
+  // 8 Jalan Ipoh Kecil <-> Chow Kit Utara (KI52)
+  'jalan_ipoh_kecil->chow_kit_utara': [
+    [3.1668, 101.6938],
+    [3.1667, 101.6943],
+    [3.1663, 101.6950],
+    [3.1659, 101.6956],
+    [3.1655, 101.6960],
+  ],
+  'chow_kit_utara->jalan_ipoh_kecil': [
+    [3.1655, 101.6960],
+    [3.1659, 101.6956],
+    [3.1663, 101.6950],
+    [3.1667, 101.6943],
+    [3.1668, 101.6938],
+  ],
+  // Bank Negara / City Bus <-> UNIRAZAK
+  'bank_negara->unirazak': [
+    [3.1530, 101.6935],
+    [3.1536, 101.6939],
+    [3.1542, 101.6944],
+    [3.1548, 101.6948],
+    [3.1552, 101.6950],
+  ],
+  'unirazak->bank_negara': [
+    [3.1552, 101.6950],
+    [3.1548, 101.6948],
+    [3.1542, 101.6944],
+    [3.1536, 101.6939],
+    [3.1530, 101.6935],
+  ],
+};
+
+function getWalkingDots(
+  fromId: string,
+  toId: string,
+  fromCoord: [number, number],
+  toCoord: [number, number]
+): [number, number][] {
+  const key = `${fromId}->${toId}`;
+  let baseCoords = PEDESTRIAN_WALK_GEOMETRIES[key];
+
+  if (!baseCoords) {
+    // Generate curved path avoiding direct straight cut through buildings
+    const midLat = (fromCoord[0] + toCoord[0]) / 2 + 0.00025;
+    const midLng = (fromCoord[1] + toCoord[1]) / 2 - 0.00015;
+    baseCoords = [fromCoord, [midLat, midLng], toCoord];
+  }
+
+  // Dense subdivision so dots are spaced ~12-14 meters apart like Google Maps / Moovit
+  const dots: [number, number][] = [];
+  for (let i = 0; i < baseCoords.length - 1; i++) {
+    const p1 = baseCoords[i];
+    const p2 = baseCoords[i + 1];
+    const segDistM = Math.hypot((p2[0] - p1[0]) * 111000, (p2[1] - p1[1]) * 111000 * 0.998);
+    const subSteps = Math.max(1, Math.round(segDistM / 12));
+    for (let s = 0; s < subSteps; s++) {
+      const frac = s / subSteps;
+      dots.push([p1[0] + (p2[0] - p1[0]) * frac, p1[1] + (p2[1] - p1[1]) * frac]);
+    }
+  }
+  dots.push(baseCoords[baseCoords.length - 1]);
+  return dots;
 }
 
 type MapTileStyle = 'google' | 'terrain' | 'satellite' | 'dark';
@@ -74,6 +233,17 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
   // Active Origin and Destination station objects
   const originStation = useMemo(() => STATIONS_BY_ID.get(originStationId), [originStationId]);
   const destStation = useMemo(() => STATIONS_BY_ID.get(destStationId), [destStationId]);
+
+  // Direct walking route detection (e.g. Putra Court to PWTC or pure walk itinerary)
+  const isDirectWalkSelected = useMemo(() => {
+    return (
+      selectedRouteId?.includes('walk') ||
+      (originStationId === 'putra_court' &&
+        (destStationId === 'pwtc_lrt' || destStationId === 'sunway_putra') &&
+        selectedRouteId !== 'route-putra-court-bus190') ||
+      (Boolean(originStation && destStation) && calculateDistanceKm(originStation!, destStation!) <= 0.45)
+    );
+  }, [selectedRouteId, originStationId, destStationId, originStation, destStation]);
 
   // Active Waze Trip selection
   const activeWazeTrip: WazeWalkingTrip = useMemo(() => {
@@ -261,55 +431,171 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
     markersGroup.clearLayers();
     routesGroup.clearLayers();
 
-    // 1. Draw Route Polylines
+    // 1. Draw Route Lines & Pedestrian Walking Trails
     if (originStation && destStation) {
-      const points: [number, number][] = [];
-      points.push([originStation.lat, originStation.lng]);
+      if (isDirectWalkSelected) {
+        // Direct walking connection (e.g. Putra Court <-> PWTC LRT along Jalan 1/64d from image_6d70ea65.png)
+        const dots = getWalkingDots(
+          originStationId,
+          destStationId,
+          [originStation.lat, originStation.lng],
+          [destStation.lat, destStation.lng]
+        );
 
-      // If we have an active itinerary with intermediate legs, add those coordinates
-      if (selectedItinerary && selectedItinerary.legs.length > 0) {
-        selectedItinerary.legs.forEach((leg) => {
-          leg.intermediateStations.forEach((stopId) => {
-            const stop = STATIONS_BY_ID.get(stopId);
-            if (stop) points.push([stop.lat, stop.lng]);
-          });
+        const walkLine = L.polyline(dots, {
+          color: '#4f46e5',
+          weight: 2,
+          opacity: 0.45,
+          dashArray: '3, 6',
         });
+        routesGroup.addLayer(walkLine);
+
+        dots.forEach((dotCoord) => {
+          const circleDot = L.circleMarker(dotCoord, {
+            radius: 6,
+            fillColor: '#4338ca',
+            fillOpacity: 1,
+            color: '#000000',
+            weight: 2,
+            className: 'walking-trail-dot',
+          });
+          routesGroup.addLayer(circleDot);
+        });
+
+        const midIdx = Math.floor(dots.length / 2);
+        const midCoord = dots[midIdx] || [originStation.lat, originStation.lng];
+        const walkDistM = Math.round(calculateDistanceKm(originStation, destStation) * 1000);
+        const walkMin = Math.max(1, Math.round(walkDistM / 75));
+
+        const walkSignIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `
+            <div class="walking-sign-badge">
+              <span class="text-xs">🚶</span>
+              <span>Walk ${walkMin}m</span>
+              <span class="text-[9px] text-indigo-300 font-normal">(${walkDistM}m)</span>
+            </div>
+          `,
+          iconSize: [110, 26],
+          iconAnchor: [55, 13],
+        });
+        const walkSignMarker = L.marker(midCoord, { icon: walkSignIcon, zIndexOffset: 850 });
+        routesGroup.addLayer(walkSignMarker);
+      } else if (selectedItinerary && selectedItinerary.legs.length > 0) {
+        selectedItinerary.legs.forEach((leg) => {
+          const fromSt = STATIONS_BY_ID.get(leg.fromStationId);
+          const toSt = STATIONS_BY_ID.get(leg.toStationId);
+          if (!fromSt || !toSt) return;
+
+          if (leg.mode === 'walk') {
+            // A. WALKING LEG: Render Circular Dots matching user's screenshot (image_6d70ea65.png)
+            const dots = getWalkingDots(
+              leg.fromStationId,
+              leg.toStationId,
+              [fromSt.lat, fromSt.lng],
+              [toSt.lat, toSt.lng]
+            );
+
+            // Subtle underlying dashed connection line
+            const walkLine = L.polyline(dots, {
+              color: '#4f46e5',
+              weight: 2,
+              opacity: 0.45,
+              dashArray: '3, 6',
+            });
+            routesGroup.addLayer(walkLine);
+
+            // Individual purple/blue circular dots with crisp black outline
+            dots.forEach((dotCoord) => {
+              const circleDot = L.circleMarker(dotCoord, {
+                radius: 5.5,
+                fillColor: '#4338ca', // Deep purple-blue / royal indigo from screenshot
+                fillOpacity: 1,
+                color: '#000000',     // Solid black border
+                weight: 2,
+                className: 'walking-trail-dot',
+              });
+              routesGroup.addLayer(circleDot);
+            });
+
+            // Pedestrian Walking Sign Badge at midpoint
+            const midIdx = Math.floor(dots.length / 2);
+            const midCoord = dots[midIdx] || [fromSt.lat, fromSt.lng];
+            const walkMinutes = leg.durationMinutes || 3;
+            const walkMeters = Math.round((leg.distanceKm || 0.2) * 1000);
+
+            const walkSignIcon = L.divIcon({
+              className: 'custom-div-icon',
+              html: `
+                <div class="walking-sign-badge">
+                  <span class="text-xs">🚶</span>
+                  <span>Walk ${walkMinutes}m</span>
+                  <span class="text-[9px] text-indigo-300 font-normal">(${walkMeters}m)</span>
+                </div>
+              `,
+              iconSize: [110, 26],
+              iconAnchor: [55, 13],
+            });
+            const walkSignMarker = L.marker(midCoord, { icon: walkSignIcon, zIndexOffset: 850 });
+            routesGroup.addLayer(walkSignMarker);
+          } else {
+            // B. TRANSIT LEG (BUS OR RAIL): Render solid transit line
+            const transitPoints: [number, number][] = [[fromSt.lat, fromSt.lng]];
+            (leg.intermediateStations || []).forEach((stopId) => {
+              const stop = STATIONS_BY_ID.get(stopId);
+              if (stop) transitPoints.push([stop.lat, stop.lng]);
+            });
+            transitPoints.push([toSt.lat, toSt.lng]);
+
+            // Shadow / border
+            const routeBorder = L.polyline(transitPoints, {
+              color: leg.mode === 'rail' ? '#991b1b' : '#0369a1',
+              weight: 8,
+              opacity: 0.35,
+              lineCap: 'round',
+              lineJoin: 'round',
+            });
+            routesGroup.addLayer(routeBorder);
+
+            // Primary transit polyline
+            const isBus = leg.mode === 'rapidkl' || leg.mode === 'gokl';
+            const routeLine = L.polyline(transitPoints, {
+              color: isBus ? (leg.mode === 'gokl' ? '#d946ef' : '#00c269') : '#ef4444',
+              weight: 5,
+              opacity: 0.95,
+              dashArray: isNavigating ? '8, 8' : undefined,
+              lineCap: 'round',
+              lineJoin: 'round',
+            });
+            routesGroup.addLayer(routeLine);
+          }
+        });
+      } else {
+        // Fallback straight transit line
+        const points: [number, number][] = [
+          [originStation.lat, originStation.lng],
+          [destStation.lat, destStation.lng],
+        ];
+        const routeLine = L.polyline(points, {
+          color: '#00c269',
+          weight: 5,
+          opacity: 0.95,
+        });
+        routesGroup.addLayer(routeLine);
       }
-
-      points.push([destStation.lat, destStation.lng]);
-
-      // Draw route shadow/border
-      const routeBorder = L.polyline(points, {
-        color: '#0284c7',
-        weight: 8,
-        opacity: 0.35,
-        lineCap: 'round',
-        lineJoin: 'round',
-      });
-      routesGroup.addLayer(routeBorder);
-
-      // Draw primary route line
-      const isBusFocus = selectedItinerary?.legs.some((l) => l.mode === 'rapidkl' || l.mode === 'gokl');
-      const routeLine = L.polyline(points, {
-        color: isBusFocus ? '#00c269' : '#38bdf8',
-        weight: 5,
-        opacity: 0.95,
-        dashArray: isNavigating ? '8, 8' : undefined,
-        lineCap: 'round',
-        lineJoin: 'round',
-      });
-      routesGroup.addLayer(routeLine);
     }
 
-    // 2. Add Intermediate Stops ONLY along the active itinerary (Clean, uncluttered)
+    // 2. Add Intermediate Stops ONLY along active transit legs
     if (destStation && selectedItinerary) {
       const activeIntermediateIds = new Set<string>();
       selectedItinerary.legs.forEach((leg) => {
-        (leg.intermediateStations || []).forEach((id) => {
-          if (id !== originStationId && id !== destStationId) {
-            activeIntermediateIds.add(id);
-          }
-        });
+        if (leg.mode !== 'walk') {
+          (leg.intermediateStations || []).forEach((id) => {
+            if (id !== originStationId && id !== destStationId) {
+              activeIntermediateIds.add(id);
+            }
+          });
+        }
       });
 
       activeIntermediateIds.forEach((stopId) => {
@@ -336,19 +622,19 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
       });
     }
 
-    // 3. Prominent Origin Marker (A)
+    // 3. Prominent Origin Marker (A) with Google Maps Green Ring (as in user screenshot image_6d70ea65.png)
     if (originStation) {
       const originIcon = L.divIcon({
         className: 'custom-div-icon',
         html: `
           <div class="flex flex-col items-center">
             <div class="relative flex items-center justify-center">
-              <span class="absolute w-8 h-8 rounded-full bg-orange-500/30 animate-ping"></span>
-              <div class="w-7 h-7 rounded-full bg-orange-600 border-2 border-white shadow-xl flex items-center justify-center text-white font-extrabold text-xs">
-                A
+              <span class="absolute w-7 h-7 rounded-full bg-emerald-500/30 animate-ping"></span>
+              <div class="w-6 h-6 rounded-full bg-white border-[3.5px] border-[#00c269] shadow-xl flex items-center justify-center">
+                <div class="w-2 h-2 rounded-full bg-[#00c269]"></div>
               </div>
             </div>
-            <div class="mt-1 px-2 py-0.5 rounded-md bg-[#18191c] border border-orange-500/70 text-orange-400 text-[10px] font-bold shadow-md whitespace-nowrap">
+            <div class="mt-1 px-2 py-0.5 rounded-md bg-[#18191c] border border-emerald-500/70 text-emerald-400 text-[10px] font-bold shadow-md whitespace-nowrap">
               Start: ${originStation.shortName || originStation.name}
             </div>
           </div>
@@ -434,8 +720,8 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
 
     const isDirectionsMode = currentView === 'directions' || currentView === 'radar' || isNavigating;
 
-    if (!isDirectionsMode || !destStation || !selectedItinerary) {
-      // Clean view: No buses shown initially until a route/directions is chosen
+    if (!isDirectionsMode || !destStation || !selectedItinerary || (isDirectWalkSelected && currentView !== 'radar')) {
+      // Clean view: No buses shown initially until a transit route is chosen (or during direct walk)
       vehiclesGroup.clearLayers();
       vehicleMarkersMapRef.current.clear();
       return;
@@ -497,29 +783,48 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
       const isGoKl = bus.lineId.includes('gokl');
       const is190 = bus.lineId.includes('190');
 
-      let pillBg = 'bg-sky-600 text-white border-sky-300 shadow-sky-950/50';
-      if (isGoKl) pillBg = 'bg-fuchsia-600 text-white border-fuchsia-300 shadow-fuchsia-950/50';
-      else if (is190) pillBg = 'bg-emerald-600 text-white border-emerald-300 ring-2 ring-emerald-400/60 shadow-emerald-950/50';
+      // Authentic Rapid Pulse / Moovit compact bus puck: 28px circular token with heading pointer
+      const puckColor = isGoKl ? '#db2777' : is190 ? '#0284c7' : '#0284c7';
+      const labelText = isGoKl ? 'GOKL 13' : routeCode;
 
       const busIcon = L.divIcon({
         className: 'custom-div-icon transit-live-bus-marker',
         html: `
-          <div class="flex flex-col items-center cursor-pointer transform hover:scale-110 transition-transform">
-            <div class="px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg border flex items-center gap-1.5 ${pillBg}">
-              <span class="text-xs">🚌</span>
-              <span>${routeCode}</span>
-              <span class="text-[9px] font-mono bg-black/40 px-1 py-0.2 rounded text-emerald-200">${bus.speedKmh || 28} km/h</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+          <div class="flex flex-col items-center cursor-pointer group select-none" title="${line?.name || routeCode}: ${bus.speedKmh || 28} km/h (Live GPS)">
+            <!-- Compact Circular Bus Puck with direction pointer -->
+            <div class="relative flex items-center justify-center">
+              <!-- Directional Pointer Triangle -->
+              <div 
+                class="absolute -top-1.5 w-0 h-0 border-x-4 border-x-transparent border-b-6 transition-transform"
+                style="border-bottom-color: ${puckColor}; transform: rotate(${bus.bearing || 0}deg) translateY(-8px);"
+              ></div>
+
+              <!-- Main Round Bus Token -->
+              <div 
+                class="w-7 h-7 rounded-full flex items-center justify-center text-white shadow-md border-2 border-white transition-transform group-hover:scale-110"
+                style="background-color: ${puckColor};"
+              >
+                <span class="text-xs">🚌</span>
+              </div>
+
+              <!-- Live GPS Ping Indicator Dot -->
+              <span class="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border border-white"></span>
+              </span>
             </div>
-            <div class="flex items-center gap-1 mt-0.5 px-1.5 py-0.2 rounded bg-black/85 text-[8px] font-bold text-emerald-300 border border-emerald-500/40 shadow-xs">
-              <span class="w-1 h-1 rounded-full bg-emerald-400 animate-ping"></span>
-              <span>LIVE GPS</span>
-              <span style="display:inline-block; transform: rotate(${bus.bearing || 180}deg); font-size: 8px;">▲</span>
+
+            <!-- Compact Route Tag -->
+            <div 
+              class="mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold tracking-tight text-white shadow-sm border border-black/20"
+              style="background-color: ${puckColor};"
+            >
+              ${labelText}
             </div>
           </div>
         `,
-        iconSize: [84, 38],
-        iconAnchor: [42, 38],
+        iconSize: [36, 44],
+        iconAnchor: [18, 22],
       });
 
       const existingMarker = vehicleMarkersMapRef.current.get(bus.id);
@@ -546,6 +851,8 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
     selectedRouteId,
     destStation,
     destStationId,
+    originStationId,
+    isDirectWalkSelected,
     selectedItinerary,
   ]);
 
@@ -694,8 +1001,8 @@ export const GeographicRadarMap: React.FC<GeographicRadarMapProps> = ({
         </div>
       </div>
 
-      {/* Live Bus Movement Status Banner (Active in Directions & Radar mode) */}
-      {(currentView === 'directions' || currentView === 'radar') && !isNavigating && (
+      {/* Live Bus Movement Status Banner (Active in Directions & Radar mode when a bus route is selected) */}
+      {(currentView === 'directions' || currentView === 'radar') && !isNavigating && !isDirectWalkSelected && (
         <div className="absolute top-16 left-4 right-4 md:left-6 md:right-auto z-20 pointer-events-auto">
           <div className="bg-[#14171f]/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/50 shadow-xl flex items-center justify-between gap-2.5 text-xs text-white">
             <div className="flex items-center gap-2 min-w-0">

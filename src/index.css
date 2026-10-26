@@ -42,3 +42,30 @@
   transition: transform 1.2s linear !important;
   will-change: transform;
 }
+
+/* Walking trail circular dots matching Google Maps / Moovit pedestrian dots */
+.walking-trail-dot {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  cursor: pointer;
+  transition: transform 0.15s ease-out;
+}
+
+.walking-trail-dot:hover {
+  transform: scale(1.3);
+}
+
+/* Pedestrian walking sign badge */
+.walking-sign-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1e1b4b;
+  color: #e0e7ff;
+  border: 1.5px solid #818cf8;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}

@@ -404,7 +404,59 @@ export const MoovitRouteList: React.FC<MoovitRouteListProps> = ({
       ];
     }
 
-    // Case 4: 8 Jalan Ipoh Kecil / Chow Kit (Moovit Corridor 180, 171, 173, 151)
+    // Case 4: Putra Court to PWTC LRT / Sunway Putra Hotel / Putra Mall (Direct walk along Jalan 1/64d from image_6d70ea65.png)
+    if (
+      originStationId === 'putra_court' ||
+      destStationId === 'putra_court' ||
+      originQuery.toLowerCase().includes('putra court') ||
+      destQuery.toLowerCase().includes('putra court') ||
+      ((destStationId === 'pwtc_lrt' || destStationId === 'sunway_putra') && originStationId === 'putra_court')
+    ) {
+      return [
+        {
+          id: 'route-putra-court-walk-pwtc',
+          title: 'Direct Walk via Jalan 1/64d to PWTC / Sunway Putra',
+          totalDurationMinutes: 4,
+          leaveTime: '3:45 pm',
+          arriveTime: '3:49 pm',
+          walkMinutes: 4,
+          busCodes: [],
+          departureTimings: [],
+          nextBusMinutes: [],
+          departureStopName: 'Jalan 1/64d Pedestrian Footpath',
+          isLiveGps: false,
+          fare: 'Free',
+          isBypass: true,
+          summarySteps: [
+            { type: 'walk', label: 'Walk 4m along Jalan 1/64d (350 m)', minutes: 4 },
+          ],
+        },
+        {
+          id: 'route-putra-court-bus190',
+          title: 'Bus 190 / Go KL Magenta via PWTC Transit Bay',
+          totalDurationMinutes: 12,
+          leaveTime: '3:47 pm',
+          arriveTime: '3:59 pm',
+          walkMinutes: 3,
+          busCodes: ['190', 'GOKL 13'],
+          departureTimings: [
+            { minutes: 2, status: 'live' },
+            { minutes: 7, status: 'scheduled' },
+          ],
+          nextBusMinutes: [2, 7],
+          departureStopName: 'PWTC / Sunway Putra Bus Bay',
+          isLiveGps: true,
+          fare: 'MYR 1.00',
+          summarySteps: [
+            { type: 'walk', label: 'Walk 3m', minutes: 3 },
+            { type: 'bus', label: 'Bus 190 / GOKL 13', isGreen: true },
+            { type: 'walk', label: 'Walk 1m', minutes: 1 },
+          ],
+        },
+      ];
+    }
+
+    // Case 5: 8 Jalan Ipoh Kecil / Chow Kit (Moovit Corridor 180, 171, 173, 151)
     return [
       {
         id: 'route-chowkit-corridor',

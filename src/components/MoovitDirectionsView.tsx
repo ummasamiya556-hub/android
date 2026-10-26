@@ -46,6 +46,11 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
 
   const isSegambutScenario =
     originStationId === 'segambut_station' || originStationId === 'smk_segambut';
+  const isPutraCourtWalk =
+    routeId === 'route-putra-court-walk-pwtc' ||
+    (originStationId === 'putra_court' &&
+      (destStationId === 'pwtc_lrt' || destStationId === 'sunway_putra') &&
+      !routeId?.includes('bus'));
 
   return (
     <div className="flex flex-col h-full bg-[#121316] text-white">
@@ -65,35 +70,44 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
 
         {/* Route Chain Strip */}
         <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar py-0.5 text-xs">
-          <span className="inline-flex items-center gap-1 text-slate-300">
-            <Footprints className="w-3.5 h-3.5 text-slate-400" />
-          </span>
-          <span className="text-slate-600 font-bold">›</span>
-
-          {isSegambutScenario ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-[#0070ba] text-white">
-              <Bus className="w-3 h-3" />
-              <span>190 / GOKL 13</span>
+          {isPutraCourtWalk ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-[#4338ca] text-white">
+              <Footprints className="w-3.5 h-3.5 text-indigo-200" />
+              <span>Walk 4 min (350 m via Jalan 1/64d)</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-[#0070ba] text-white">
-              <Bus className="w-3 h-3" />
-              <span>180 / 171 / 173 / 151</span>
-            </span>
+            <>
+              <span className="inline-flex items-center gap-1 text-slate-300">
+                <Footprints className="w-3.5 h-3.5 text-slate-400" />
+              </span>
+              <span className="text-slate-600 font-bold">›</span>
+
+              {isSegambutScenario ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-[#0070ba] text-white">
+                  <Bus className="w-3 h-3" />
+                  <span>190 / GOKL 13</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-[#0070ba] text-white">
+                  <Bus className="w-3 h-3" />
+                  <span>180 / 171 / 173 / 151</span>
+                </span>
+              )}
+
+              <span className="text-slate-600 font-bold">›</span>
+
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-[#0284c7] text-white">
+                <Bus className="w-3 h-3" />
+                <span>851</span>
+              </span>
+
+              <span className="text-slate-600 font-bold">›</span>
+
+              <span className="inline-flex items-center gap-1 text-slate-300">
+                <Footprints className="w-3.5 h-3.5 text-slate-400" />
+              </span>
+            </>
           )}
-
-          <span className="text-slate-600 font-bold">›</span>
-
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-[#0284c7] text-white">
-            <Bus className="w-3 h-3" />
-            <span>851</span>
-          </span>
-
-          <span className="text-slate-600 font-bold">›</span>
-
-          <span className="inline-flex items-center gap-1 text-slate-300">
-            <Footprints className="w-3.5 h-3.5 text-slate-400" />
-          </span>
         </div>
 
         {/* Tips banner (Screenshot 1) */}
@@ -128,20 +142,30 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* Step 1: Origin Starting Point */}
         <div className="relative flex items-start gap-3">
-          {/* Orange Ring */}
-          <div className="w-6 h-6 rounded-full border-4 border-orange-500 bg-[#121316] flex items-center justify-center shrink-0 z-10">
-            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+          {/* Origin Ring */}
+          <div
+            className={`w-6 h-6 rounded-full border-4 ${
+              isPutraCourtWalk ? 'border-[#00c269]' : 'border-orange-500'
+            } bg-[#121316] flex items-center justify-center shrink-0 z-10`}
+          >
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                isPutraCourtWalk ? 'bg-[#00c269]' : 'bg-orange-500'
+              }`}
+            />
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline justify-between gap-2">
               <h3 className="text-sm font-bold text-white leading-tight">
-                {isSegambutScenario
+                {isPutraCourtWalk
+                  ? 'Putra Court Condominium (Jalan 1/64d)'
+                  : isSegambutScenario
                   ? 'Segambut KTM Komuter Station'
                   : '8, Jalan Ipoh Kecil, Chow Kit, 50350 Kuala Lumpur'}
               </h3>
               <div className="text-right shrink-0">
-                <span className="text-xs font-bold text-white block">3:43 pm</span>
+                <span className="text-xs font-bold text-white block">3:45 pm</span>
                 <span className="text-[10px] text-slate-400">Leave at</span>
               </div>
             </div>
@@ -156,7 +180,11 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
           >
             <Footprints className="w-4 h-4 text-slate-400" />
             <span>
-              {isSegambutScenario ? 'Walk 210 m | 3 min' : 'Walk 370 m | 4 min'}
+              {isPutraCourtWalk
+                ? 'Walk 350 m | 4 min along Jalan 1/64d'
+                : isSegambutScenario
+                ? 'Walk 210 m | 3 min'
+                : 'Walk 370 m | 4 min'}
             </span>
             {isWalkExpanded ? (
               <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
@@ -170,10 +198,48 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
             <div className="p-3 rounded-xl bg-[#1a1b20] border border-[#2a2c34] space-y-2.5 text-xs text-slate-300">
               <div className="flex items-center justify-between text-[11px] text-cyan-400 font-semibold border-b border-[#282a33] pb-1.5">
                 <span>WAZE PEDESTRIAN SIGNS</span>
-                <span className="text-emerald-400 font-normal">85% Covered canopy</span>
+                <span className="text-emerald-400 font-normal">
+                  {isPutraCourtWalk ? 'Covered Pavement & River Walk' : '85% Covered canopy'}
+                </span>
               </div>
 
-              {isSegambutScenario ? (
+              {isPutraCourtWalk ? (
+                <>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                      <ArrowUp className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <span>Exit Putra Court north concourse onto Jalan 1/64d sidewalk.</span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                      <CornerUpRight className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <span>
+                      Follow continuous pedestrian curve along Jalan 1/64d past river/track corridor (220 m).
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                      <Footprints className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <span>
+                      Walk past Sunway Putra Hotel entrance toward PWTC AG4/SP4 covered bridge (130 m).
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded bg-emerald-950/80 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="font-semibold text-white">
+                      Arrive at PWTC (World Trade Centre KL) / Sunway Putra Mall!
+                    </span>
+                  </div>
+                </>
+              ) : isSegambutScenario ? (
                 <>
                   <div className="flex items-center gap-2.5">
                     <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
@@ -235,12 +301,13 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
           )}
         </div>
 
-        {/* Step 3: Bus Boarding Station (Screenshot 1: Chow Kit (Utara) KI52) */}
-        <div className="relative flex items-start gap-3">
-          {/* Blue Bus Icon Circle */}
-          <div className="w-6 h-6 rounded-full bg-[#0070ba] text-white flex items-center justify-center shrink-0 z-10">
-            <Bus className="w-3.5 h-3.5" />
-          </div>
+        {/* Step 3: Bus Boarding Station (Only if NOT pure walk) */}
+        {!isPutraCourtWalk && (
+          <div className="relative flex items-start gap-3">
+            {/* Blue Bus Icon Circle */}
+            <div className="w-6 h-6 rounded-full bg-[#0070ba] text-white flex items-center justify-center shrink-0 z-10">
+              <Bus className="w-3.5 h-3.5" />
+            </div>
 
           <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center justify-between">
@@ -316,6 +383,7 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
             )}
           </div>
         </div>
+      )}
 
         {/* Step 4: Destination Arrival */}
         <div className="relative flex items-start gap-3">
@@ -327,12 +395,16 @@ export const MoovitDirectionsView: React.FC<MoovitDirectionsViewProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline justify-between gap-2">
               <h3 className="text-sm font-bold text-white leading-tight">
-                {isSegambutScenario
+                {isPutraCourtWalk
+                  ? 'PWTC (World Trade Centre KL) AG4 / SP4'
+                  : isSegambutScenario
                   ? 'PWTC (World Trade Centre KL) / Putra'
                   : 'LRT Masjid Jamek / Pasar Seni'}
               </h3>
               <div className="text-right shrink-0">
-                <span className="text-xs font-bold text-white block">4:28 pm</span>
+                <span className="text-xs font-bold text-white block">
+                  {isPutraCourtWalk ? '3:49 pm' : '4:28 pm'}
+                </span>
                 <span className="text-[10px] text-slate-400">Arrive</span>
               </div>
             </div>
